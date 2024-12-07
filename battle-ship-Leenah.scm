@@ -39,18 +39,25 @@
 ;;; Recursively goes through the elements in 'vec'
 ;;; and sets each elements to be 'square-piece'
 (define grid-vec
-  (lambda (vec i)
+  (lambda (vec i griddy)
     (if (>= i (vector-length vec))
       void
       (begin
-        (vector-set! vec i (square-piece 50))
-        (grid-vec vec (+ i 1))
-        vec))))
+      (if (equal? (vector-ref griddy i) 1)
+        (vector-set! vec i (overlay red-peg (square-piece 50)))
+        (vector-set! vec i (square-piece 50)))
+      (grid-vec vec (+ i 1) griddy)
+      vec))))
 
 ;;; (grid) -> vector? of-image?
 ;;; Returns the drif of the game as a vector
+
+(define grid0 (make-vector 100 0))
+(define grid1 (make-vector 100 0))
+
+
 (define grid
-  (grid-vec (make-vector 100 0) 0))
+  (grid-vec grid0 0))
 
 
 ;;; Try overlying the ships
@@ -150,51 +157,57 @@
 
 
 ;initial model struct
-(struct state (peg x y))
+(struct state (peg x y griddy-p1 griddy-p2 turns))
 
-; view function
+
+(define grid-maker
+  (lambda (st canvass i k j vec)
+  (if (equal? k 500)
+    null
+    (begin (canvas-drawing! canvass i k (vector-ref vec j))
+      (if (< i 450)
+        (grid-maker st canvass (+ i 50) k (+ j 1) vec)
+        (grid-maker st canvass 0 (+ k 50) (+ j 1) vec))))))
+
 (define view
   (lambda (st canvass)
     (match st
-      [(state peg x y)
+      [(state peg x y griddy-p1 griddy-p2 turns)
         (begin
           (ignore
+            (begin 
           ;;; This is purposefully low-level for testing
-          (begin 
-                 (canvas-drawing! canvass 0 0 (vector-ref grid 0))
-                 (canvas-drawing! canvass 50 0 (vector-ref grid 0))
-                 (canvas-drawing! canvass 50 50 (vector-ref grid 0))
-                 (canvas-drawing! canvass 0 50 (vector-ref grid 0))))
-          (cond 
-            [(equal? (state-peg st) white-peg)
-              (canvas-drawing! canvass x y red-peg)]
-        
-            [(equal? (state-peg st) red-peg)
-              (canvas-drawing! canvass x y white-peg)]
-            [else "what's going on?"]))])))
+            (if (negative? turns)
+            (grid-maker st canvass 0 0 0 (grid-vec (make-vector 100 0) 0 griddy-p1)); (canvas-circle! canvass x y 20 "solid" "blue");
+            (grid-maker st canvass 0 0 0 (grid-vec (make-vector 100 0) 0 griddy-p2)); (canvas-circle! canvass x y 20 "solid" "red") ;
+              ))))])))
       
 ;the update function  
 (define update
   (lambda (msg st)
     (match st
-      [(state peg x y)
+      [(state peg x y griddy-p1 griddy-p2 turns)
         (match msg
           [(event-mouse-click btn cx cy)
-            (if (equal? (state-peg st) white-peg)
-                (state red-peg (truncate(- cx 10)) (truncate(- cy 10)))
-                (state white-peg (truncate(- cx 10)) (truncate(- cy 10))))])])))
+            (if (negative? turns)
+            (let* ([a (vector-set! griddy-p1 (truncate (+ (* (/ cy 50) 10) (/ cx 50))) 1)])
+              (state peg x y griddy-p1 griddy-p2 (* turns -1)))
+            (let* ([a (vector-set! griddy-p2 (truncate (+ (* (/ cy 50) 10) (/ cx 50))) 1)])
+              (state peg x y griddy-p1 griddy-p2 (* turns -1)))
+              )])])))
+
                       
              
 
 (display
   (reactive-canvas
-    100 100
+    500 500
     ;initial model
-      (state (circle 10 "solid" "black") 15 15)
+      (state (circle 10 "solid" "black") 15 15 grid0 grid1 1)
     ;view function
       view
     ;update fucntion
-      update
+      update; eventualy this will need to update the grid function.
     ;subscriptions
     (on-mouse-click)))
 
