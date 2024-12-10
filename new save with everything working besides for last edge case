@@ -1,0 +1,183 @@
+; ; Final-Project
+
+(import image)
+(import canvas)
+(import reactive)
+(import lab)
+(problem "This file lacks documentation on some functions, and there's a lot of commneted code (under experimentation.)")
+
+
+
+(define white-peg
+  (overlay
+    (circle 10 "outline" "black")
+    (circle 10 "solid" "white")))
+
+(define red-peg
+  (overlay
+    (circle 10 "outline" "black")
+    (circle 10 "solid" "red")))
+
+
+;from Maddy
+;;; (square-piece size) -> drawing?
+;;;    size : integer? size > 0
+;;; Returns a solid, grey square of size 'size' with a black circle 
+;;; of radius 'size/5' overlayed on top of it
+(define square-piece
+  (lambda (size)
+    (overlay/align "middle" "center"
+                    (circle (/ size 5) "solid" "black") 
+                    (square size "outline" "black")
+                    (square size "solid" "gray"))))
+
+
+
+;;; (grid-vec vec i)-> void?
+;;;    vec : vector?
+;;;    i : integer? represents the index of the vector
+;;; Recursively goes through the elements in 'vec'
+;;; and sets each elements to be 'square-piece'
+(define grid-vec
+  (lambda (vec i griddy)
+    (if (>= i (vector-length vec))
+      void
+      (begin
+      (if (equal? (vector-ref griddy i) -1)
+        (vector-set! vec i (overlay (square-piece 25)(square-piece 50))); (vector-ref griddy i)));(square-piece 50)))
+      (if (equal? (vector-ref griddy i) 1)
+        (vector-set! vec i (overlay red-peg (square-piece 50)));;(square-piece 50)))
+      (if (equal? (vector-ref griddy i) 2)
+      (vector-set! vec i (overlay white-peg (square-piece 50)));;(square-piece 50)))
+        (vector-set! vec i (square-piece 50)))))
+      (grid-vec vec (+ i 1) griddy)
+      vec))))
+
+;;; (grid) -> vector? of-image?
+;;; Returns the drif of the game as a vector
+
+(define grid0 (make-vector 100 0))
+(define grid1 (make-vector 100 0))
+
+
+(define grid
+  (grid-vec grid0 0))
+
+
+
+
+
+
+;The code below works
+(part "A reactive grid of pegs")
+;;; The code below is using the 'reactive library' for more information check the
+;;; 'Interactivity, Events, and Reactivity' reading.
+
+
+
+;initial model struct
+(struct state (peg x y griddy-p1 griddy-p2 turns ships-p1 ships-p2))
+
+
+(define grid-maker
+  (lambda (st canvass i k j vec ships turns)
+  (if (equal? k 500)
+    null
+    (begin (canvas-drawing! canvass i k (vector-ref vec j))
+     (canvas-text! canvass 100 100 (string-append "ships: "(number->string ships)) 30 "solid" "white")
+     (canvas-text! canvass 300 100 (string-append "player " (number->string turns)) 30 "solid" "white")
+      (if (< i 450)
+        (grid-maker st canvass (+ i 50) k (+ j 1) vec ships turns)
+        (grid-maker st canvass 0 (+ k 50) (+ j 1) vec ships turns))
+    ))))
+
+;(canvas-drawing! canvass x y red-peg)
+
+; ; view function
+(define view
+  (lambda (st canvass)
+    (match st
+      [(state peg x y griddy-p1 griddy-p2 turns ships-p1 ships-p2)
+        (begin
+          (ignore
+            (begin 
+          ;;; This is purposefully low-level for testing
+            (if (negative? turns)
+            (grid-maker st canvass 0 0 0 (grid-vec (make-vector 100 0) 0 griddy-p1) ships-p1 turns); (canvas-circle! canvass x y 20 "solid" "blue");
+            (grid-maker st canvass 0 0 0 (grid-vec (make-vector 100 0) 0 griddy-p2) ships-p2 turns); (canvas-circle! canvass x y 20 "solid" "red") ;
+              ))))])))
+
+      ;Carrier (occupies 5 spaces), Battleship (4), Cruiser (3), Submarine (3), and Destroyer (2).
+
+; (define update
+;   (lambda (msg st)
+;     (match st
+;       [(state peg x y griddy-p1 griddy-p2 turns)
+;         (match msg
+;           [(event-mouse-click btn cx cy)
+;             (if (negative? turns)
+;             (let* ([a (vector-set! griddy-p1 (truncate (+ (* (/ cy 50) 10) (/ cx 50))) 1)])
+;               (state peg x y griddy-p1 griddy-p2 (* turns -1)))
+;             (let* ([a (vector-set! griddy-p2 (truncate (+ (* (/ cy 50) 10) (/ cx 50))) 1)])
+;               (state peg x y griddy-p1 griddy-p2 (* turns -1)))
+;               )])])))
+
+
+;the update function  
+(define update
+  (lambda (msg st)
+    (match st
+      [(state peg x y griddy-p1 griddy-p2 turns ships-p1 ships-p2)
+        (match msg
+          [(event-mouse-click btn cx cy) 
+      (if (or (not (equal? ships-p1 0)) (not (equal? ships-p2 0)))
+        (if (negative? turns)
+          (let* ([a (vector-set! griddy-p1 (truncate (+ (* (truncate (/ cy 50)) 10) (truncate (/ cx 50)))) -1)])
+              (state peg x y griddy-p1 griddy-p2 (* turns -1) (- ships-p1 1) ships-p2))
+          (let* ([a (vector-set! griddy-p2 (truncate (+ (* (truncate (/ cy 50)) 10) (truncate (/ cx 50)))) -1)])
+              (state peg x y griddy-p1 griddy-p2 (* turns -1) ships-p1 (- ships-p2 1))))
+
+        
+       ; (if (negative? turns)
+       ;      (let* ([a (vector-set! griddy-p1 (truncate (+ (* (truncate (/ cy 50)) 10) (truncate (/ cx 50)))) 1)])
+       ;        (state peg x y griddy-p1 griddy-p2 (* turns -1) ships-p1 ships-p2))
+       ;      (let* ([a (vector-set! griddy-p2 (truncate (+ (* (truncate (/ cy 50)) 10) (truncate (/ cx 50)))) 1)])
+       ;        (state peg x y griddy-p1 griddy-p2 (* turns -1) ships-p1 ships-p2)))
+
+           (if (negative? turns)
+             (if (equal? (vector-ref griddy-p2 (truncate (+ (* (truncate (/ cy 50)) 10) (truncate (/ cx 50))))) -1)               
+            (let* ([a (vector-set! griddy-p1 (truncate (+ (* (truncate (/ cy 50)) 10) (truncate (/ cx 50)))) 1)])
+              (state peg x y griddy-p1 griddy-p2 (* turns -1) ships-p1 ships-p2))
+               (let* ([a (vector-set! griddy-p1 (truncate (+ (* (truncate (/ cy 50)) 10) (truncate (/ cx 50)))) 2)])
+              (state peg x y griddy-p1 griddy-p2 (* turns -1) ships-p1 ships-p2)))
+
+            (if (equal? (vector-ref griddy-p1 (truncate (+ (* (truncate (/ cy 50)) 10) (truncate (/ cx 50))))) -1)        
+            (let* ([a (vector-set! griddy-p2 (truncate (+ (* (truncate (/ cy 50)) 10) (truncate (/ cx 50)))) 1)])
+              (state peg x y griddy-p1 griddy-p2 (* turns -1) ships-p1 ships-p2))
+              (let* ([a (vector-set! griddy-p2 (truncate (+ (* (truncate (/ cy 50)) 10) (truncate (/ cx 50)))) 2)])
+              (state peg x y griddy-p1 griddy-p2 (* turns -1) ships-p1 ships-p2)))
+        ))])])))
+
+
+             ;(truncate (+ (* (truncate (/ cy 50)) 10) (truncate (/ cx 50))))
+
+(display
+  (reactive-canvas
+    500 500
+    ;initial model
+      (state (circle 10 "solid" "black") 15 15 grid0 grid1 1 17 17)
+    ;view function
+      view
+    ;update fucntion
+      update; eventualy this will need to update the grid function.
+    ;subscriptions
+    (on-mouse-click)))
+
+
+
+
+
+(problem "Click anywhere on the canvas to place the peg. 
+  \n Tip: You have to click exactly in the middle of the 
+          black circle to place the red/white peg accurately.
+  \n Tip: The fist click makes a red peg, click a second time to place a white peg on the grid")
